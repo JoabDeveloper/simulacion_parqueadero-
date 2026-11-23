@@ -1,13 +1,30 @@
-# Simulador Montecarlo del parqueadero – C.C. Plaza El Mirador
+# Parqueadero Plaza El Mirador – Simulación Montecarlo
 
 Programa en **Python** (interfaz y lógica) que simula, vehículo por vehículo, las **entradas y salidas** del
 parqueadero para los días que se elijan en un **calendario**. Parte del registro real de octubre de 2026
 (24.830 vehículos) y tiene en cuenta festivos de Colombia, quincenas, puentes, temporada alta/baja y fechas
-comerciales.
+comerciales. La interfaz es *responsive*: funciona en computador, tablet y celular.
 
 ---
 
-## 1. Cómo ejecutarlo
+## 0. Publicación en internet (Streamlit Community Cloud)
+
+La app es de Streamlit y necesita un servidor de Python, por eso se publica en **Streamlit Community Cloud**
+(gratis, conectado a este repositorio). GitHub Pages no sirve para esto porque solo aloja páginas estáticas.
+
+1. Entra a **https://share.streamlit.io** e inicia sesión con la cuenta de GitHub dueña del repositorio.
+2. **Create app → Deploy a public app from GitHub** y llena:
+   - *Repository:* `JoabDeveloper/simulacion_parqueadero-` · *Branch:* `main` · *Main file path:* `app.py`
+   - *App URL:* el nombre que quieras (p. ej. `parqueadero-plaza-el-mirador`).
+   - *Advanced settings → Python version:* **3.13** (o 3.12).
+3. **Deploy**. La primera vez tarda unos minutos mientras instala `requirements.txt`.
+
+Cada `git push` a `main` actualiza la app publicada automáticamente. Si la app no recibe visitas en varios días,
+Streamlit la pone en reposo; basta abrirla y pulsar el botón para despertarla.
+
+---
+
+## 1. Cómo ejecutarlo en tu computador
 
 Requisitos: Python 3.10 o superior.
 
