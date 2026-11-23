@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+env/
+
+# Streamlit: secretos locales (la configuración del tema sí se sube)
+.streamlit/secrets.toml
+
+# Resultados generados por la línea de comandos
+resultados*/
+simulacion_parqueadero_*.xlsx
+
+# Sistema y editores
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# Herramientas de agentes locales
+.agents/
+.claude/

@@ -1,0 +1,23 @@
+# Tema claro de bajo cansancio visual: fondos gris azulado muy claro (sin blanco puro),
+# tinta pizarra oscura (sin negro puro). Los tonos de cada sección se definen en parqueadero/vista.py.
+[theme]
+base = "light"
+primaryColor = "#2F6DB5"
+backgroundColor = "#F2F4F7"
+secondaryBackgroundColor = "#E9EDF2"
+textColor = "#1E2733"
+font = "sans serif"
+baseRadius = "0.6rem"
+borderColor = "#DFE4EB"
+showWidgetBorder = true
+chartCategoricalColors = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6", "#e34948"]
+
+[theme.sidebar]
+backgroundColor = "#F3F6FA"
+secondaryBackgroundColor = "#E9EDF2"
+
+[client]
+toolbarMode = "minimal"
+
+[browser]
+gatherUsageStats = false
