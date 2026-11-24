@@ -23,6 +23,7 @@ import datetime as dt
 import hashlib
 import itertools
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -313,30 +314,35 @@ def pedir_simulacion(fechas: tuple, franja: tuple):
     ss.pedido = (list(fechas), tuple(franja))
 
 
+@st.cache_resource
+def ejecutor_excel() -> ThreadPoolExecutor:
+    """Hilos para armar el Excel en segundo plano mientras el usuario revisa los resultados."""
+    return ThreadPoolExecutor(max_workers=2, thread_name_prefix="excel")
+
+
+def preparar_excel():
+    """Empieza a armar el Excel de la simulación actual en segundo plano (no bloquea la página)."""
+    ss.excel_futuro = (ejecutor_excel().submit(a_excel, ss.S, ss.res, P), ss.res)
+
+
 def boton_excel(clave: str, tipo="secondary"):
     """
-    El Excel se arma solo cuando se pide (es el paso más lento). Así la simulación termina antes y los
-    resultados aparecen de inmediato en todas las pestañas.
+    Botón de descarga directa (un solo clic). El Excel se empieza a armar en segundo plano apenas termina la
+    simulación; al pulsar el botón se entrega ya listo o, si aún le faltan segundos, en cuanto termina.
     """
     if "res" not in ss:
         return
-    r = ss.res
-    if ss.get("excel") and ss.get("excel_sim") == ss.get("sim"):
-        st.download_button("Descargar en Excel", data=ss.excel, key=clave, type=tipo, icon=":material/download:",
-                           file_name=f"simulacion_parqueadero_{r.dias[0].fecha:%Y%m%d}_{r.dias[-1].fecha:%Y%m%d}.xlsx",
-                           mime=MIME_XLSX, width="stretch")
+    if ss.get("excel_futuro") is None:
+        preparar_excel()
+    futuro, r = ss.excel_futuro
+    if futuro.done() and futuro.exception():
+        st.error(f"No se pudo preparar el Excel: {futuro.exception()}")
+        st.button("Reintentar el Excel", key=f"reint_{clave}", on_click=preparar_excel, width="stretch")
         return
-    if st.button("Preparar Excel", key=f"prep_{clave}", type=tipo, icon=":material/table_view:", width="stretch",
-                 help="Arma el libro de Excel con todas las tablas y gráficas de esta simulación."):
-        with st.spinner("Preparando el Excel… puede tardar unos segundos."):
-            try:
-                ss.excel, ss.error_excel = a_excel(ss.S, r, P), None
-            except Exception as e:  # el Excel no debe impedir ver los resultados
-                ss.excel, ss.error_excel = None, str(e)
-        ss.excel_sim = ss.get("sim")
-        st.rerun()
-    if ss.get("error_excel") and ss.get("excel_sim") == ss.get("sim"):
-        st.error(f"No se pudo preparar el Excel: {ss.error_excel}")
+    st.download_button("Descargar en Excel", data=futuro.result, key=clave, type=tipo, icon=":material/download:",
+                       file_name=f"simulacion_parqueadero_{r.dias[0].fecha:%Y%m%d}_{r.dias[-1].fecha:%Y%m%d}.xlsx",
+                       mime=MIME_XLSX, width="stretch", on_click="ignore",
+                       help="Libro con todas las tablas y gráficas de esta simulación.")
 
 
 def sin_resultados(tono: str):
@@ -372,7 +378,7 @@ if ss.get("pedido"):
     zona.empty()
     ss.res, ss.S = res, S
     ss.sim = ss.get("sim", 0) + 1
-    ss.excel, ss.error_excel = None, None
+    preparar_excel()   # el Excel se arma en segundo plano mientras el usuario revisa los resultados
     st.toast(f"Simulación lista: {len(res.dias)} días en {res.segundos:.1f} s", icon=":material/check_circle:")
 
 # ---------------------------------------------------------------------------
