@@ -25,6 +25,14 @@ sin_errores(at, f"carga inicial ({time.time() - t:.1f} s)")
 t = time.time()
 next(b for b in at.button if b.label == "Simular").click().run()
 sin_errores(at, f"simulación ({time.time() - t:.1f} s)")
+# en la MISMA ejecución del clic ya deben verse los resultados en las pestañas (sin «Todavía no hay resultados»)
+assert "S" in at.session_state, "la simulación no guardó resultados"
+vacios = [m.value for m in at.markdown if "Todavía no hay resultados" in m.value]
+assert not vacios, f"hay pestañas sin resultados tras simular: {len(vacios)}"
+print("resultados visibles en todas las pestañas: OK")
+
+next(b for b in at.button if b.label == "Preparar Excel").click().run()
+sin_errores(at, "preparar Excel")
 assert at.session_state["excel"], "no se generó el Excel"
 print("Excel:", len(at.session_state["excel"]), "bytes")
 

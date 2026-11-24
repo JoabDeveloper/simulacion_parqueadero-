@@ -308,13 +308,34 @@ def agregar_rango():
         ss.sel.update(a + dt.timedelta(days=i) for i in range((b - a).days + 1))
 
 
+def pedir_simulacion(fechas: tuple, franja: tuple):
+    """Al pulsar Simular: se guarda el pedido y la simulación corre al inicio de la siguiente ejecución."""
+    ss.pedido = (list(fechas), tuple(franja))
+
+
 def boton_excel(clave: str, tipo="secondary"):
-    if ss.get("excel"):
-        r = ss.res
+    """
+    El Excel se arma solo cuando se pide (es el paso más lento). Así la simulación termina antes y los
+    resultados aparecen de inmediato en todas las pestañas.
+    """
+    if "res" not in ss:
+        return
+    r = ss.res
+    if ss.get("excel") and ss.get("excel_sim") == ss.get("sim"):
         st.download_button("Descargar en Excel", data=ss.excel, key=clave, type=tipo, icon=":material/download:",
                            file_name=f"simulacion_parqueadero_{r.dias[0].fecha:%Y%m%d}_{r.dias[-1].fecha:%Y%m%d}.xlsx",
                            mime=MIME_XLSX, width="stretch")
-    elif ss.get("error_excel"):
+        return
+    if st.button("Preparar Excel", key=f"prep_{clave}", type=tipo, icon=":material/table_view:", width="stretch",
+                 help="Arma el libro de Excel con todas las tablas y gráficas de esta simulación."):
+        with st.spinner("Preparando el Excel… puede tardar unos segundos."):
+            try:
+                ss.excel, ss.error_excel = a_excel(ss.S, r, P), None
+            except Exception as e:  # el Excel no debe impedir ver los resultados
+                ss.excel, ss.error_excel = None, str(e)
+        ss.excel_sim = ss.get("sim")
+        st.rerun()
+    if ss.get("error_excel") and ss.get("excel_sim") == ss.get("sim"):
         st.error(f"No se pudo preparar el Excel: {ss.error_excel}")
 
 
@@ -328,6 +349,31 @@ def pills_periodo(res) -> list[str]:
     return [f"<b>{len(res.dias)}</b> días", f"{res.dias[0].fecha:%d/%m/%Y} – {res.dias[-1].fecha:%d/%m/%Y}",
             f"<b>{res.cfg.replicas}</b> réplicas por día"]
 
+
+# ---------------------------------------------------------------------------
+# Simulación pedida
+# ---------------------------------------------------------------------------
+# Corre ANTES de dibujar el encabezado y las pestañas: el progreso se ve en cualquier pestaña en la que esté
+# el usuario y, al terminar, todas las pestañas se dibujan en esta misma ejecución ya con los resultados.
+# El espacio del progreso se reserva SIEMPRE (aunque no se simule): si solo existiera al simular, las pestañas
+# cambiarían de posición entre ejecuciones y Streamlit las reiniciaría, devolviendo al usuario a «Inicio».
+zona = st.empty()
+if ss.get("pedido"):
+    fechas_p, franja_p = ss.pop("pedido")
+    with zona.container(key="panel-azul-simulando"):
+        html_md(vista.panel_cabecera(
+            f"Simulando {len(fechas_p)} días × {int(replicas)} réplicas…",
+            "Puedes quedarte en cualquier pestaña: los resultados aparecen solos al terminar.", "hourglass_top"))
+        barra = st.progress(0.0, text="Preparando la simulación…")
+        res = simular(P, fechas_p, configuracion(franja_p),
+                      progreso=lambda x: barra.progress(min(0.95, 0.95 * x), text=f"Simulando… {x:.0%} de los días"))
+        barra.progress(0.97, text="Calculando indicadores y riesgo…")
+        S = resumen(res, P)
+    zona.empty()
+    ss.res, ss.S = res, S
+    ss.sim = ss.get("sim", 0) + 1
+    ss.excel, ss.error_excel = None, None
+    st.toast(f"Simulación lista: {len(res.dias)} días en {res.segundos:.1f} s", icon=":material/check_circle:")
 
 # ---------------------------------------------------------------------------
 # Encabezado
@@ -491,26 +537,14 @@ with tabs[1]:
 
             html_md(vista.paso_ctrl(3, "Ejecuta", f"{len(seleccion)} días × {int(replicas)} réplicas = {NUM(len(seleccion) * int(replicas))} jornadas"
                                     if seleccion else "Elige al menos un día"))
-            simular_ya = st.button("Simular", type="primary", icon=":material/play_arrow:", disabled=not seleccion, width="stretch")
-            if simular_ya:
-                barra = st.progress(0.0, text="Simulando…")
-                res = simular(P, seleccion, configuracion(franja),
-                              progreso=lambda x: barra.progress(min(0.9, 0.9 * x), text=f"Simulando… {x:.0%}"))
-                S = resumen(res, P)
-                barra.progress(0.95, text="Preparando el Excel…")
-                try:
-                    ss.excel, ss.error_excel = a_excel(S, res, P), None
-                except Exception as e:  # el Excel no debe impedir ver los resultados
-                    ss.excel, ss.error_excel = None, str(e)
-                ss.res, ss.S = res, S
-                ss.sim = ss.get("sim", 0) + 1
-                barra.empty()
-                st.toast(f"Simulación lista: {len(res.dias)} días en {res.segundos:.1f} s", icon=":material/check_circle:")
-                st.rerun()
+            # El botón solo registra el pedido; la simulación corre arriba de las pestañas (ver «Simulación pedida»)
+            st.button("Simular", type="primary", icon=":material/play_arrow:", disabled=not seleccion, width="stretch",
+                      on_click=pedir_simulacion, args=(tuple(seleccion), tuple(franja)))
             if "res" in ss:
                 r = ss.res
                 html_md(f'<div class="listo">✓ Listo: {len(r.dias)} días × {r.cfg.replicas} réplicas = '
-                        f'{NUM(len(r.dias) * r.cfg.replicas)} jornadas en {r.segundos:.1f} s. Mira la pestaña <b>Resultados</b>.</div>')
+                        f'{NUM(len(r.dias) * r.cfg.replicas)} jornadas en {r.segundos:.1f} s. Mira las pestañas <b>Resultados</b>, '
+                        f'<b>Por hora</b> y <b>Riesgo e ingresos</b>.</div>')
                 boton_excel("dl_cal", "primary")
 
     with panel(f"{cal.MESES[mes - 1]} {anio} en detalle", "Festivos, temporada de cada día y de dónde salen los factores.", "info", "pizarra"):
